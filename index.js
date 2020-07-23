@@ -1,12 +1,8 @@
 require('dotenv').config();
 const discord = require('discord.js'),
     fs = require('fs'),
-    moment = require('moment'),
-    async = require('async'),
-    lodash = require('lodash'),
-    underscore = require('underscore');
+    moment = require('moment');
 var {prefix} = require('./config.json');
-const { RSA_NO_PADDING } = require('constants');
 const client = new discord.Client();
 
 function randomColour() {
