@@ -13,12 +13,18 @@ for (const file of commandFiles) {
     console.log(command.name);
 }
 
-const commands = new discord.Collection();
-
-const users = new Map();users.clear();
-
 client.on('ready', () => {
     console.log('ready');
+});
+client.on('messageReactionAdd', (reaction, user) => {
+    let message = reaction.message, emoji = reaction.emoji;
+    if(emoji.name == '👍'){
+        let member = message.guild.members.cache.find(member => member.id === user.id);
+        if(member){
+            member.roles.add('733838178162704405');
+            reaction.remove();
+        }
+    }
 });
 client.on('message', message => {
     if(message.content.startsWith(prefix)){
@@ -29,6 +35,19 @@ client.on('message', message => {
         switch(command){
         case "avatar":{
             client.cmds.get('avatar').execute(message);
+        }break;
+        case "verify":{
+            var rgb_verify = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
+            message.delete();
+            const verifyEmbed = new discord.MessageEmbed()
+            .setTitle('REACT TO VERIFY')
+            .setDescription('CLICK THE REACTION DOWN BELOW TO VERIFY')
+            .setColor(rgb_verify);
+            message.channel.send(verifyEmbed).then(sentMessage => {
+                sentMessage.react('👍');
+            });
+
+            // 👍
         }break;
         case "howgay":{
             client.cmds.get('howgay').execute(message);
