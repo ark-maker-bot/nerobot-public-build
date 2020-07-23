@@ -5,15 +5,6 @@ const discord = require('discord.js'),
 var {prefix} = require('./config.json');
 const client = new discord.Client();
 
-function randomColour() {
-    var letters = '0123456789ABCDEF';
-    var color = '#';
-    for (var i = 0; i < 6; i++) {
-      color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
-
 client.cmds = new discord.Collection();
 const commandFiles = fs.readdirSync('./cmds').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
