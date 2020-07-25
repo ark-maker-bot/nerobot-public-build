@@ -13,9 +13,11 @@ for (const file of commandFiles) {
     console.log(command.name);
 }
 
-let maxInts = [1,2,3,4,5,6,7,8,9];
-
+const webhookClient = new discord.WebhookClient(process.env.WEBID, process.env.WEBTOKEN);
 client.on('ready', () => {
+    client.fetchWebhook(process.env.WEBID, process.env.WEBTOKEN)
+    .then(webhook => console.log('collected webhook with name:' + webhook.name))
+    .catch(console.error);
     console.log('ready');
 });
 client.on('messageReactionAdd', (reaction, user) => {
@@ -50,62 +52,60 @@ client.on('message', async (message) => {
             // 👍 👎
         }break;
         case "poll":{
-            //client.cmds.get('poll').execute(message, args); maybe another time but who knows - nero
-            console.log(args[0]);
-            console.log(args[1]);
-            message.delete();
-    
-            let title = args.slice(1).join(" ");
-            if(!title)title = "no title";
-
+            client.cmds.get('poll').execute(message, args); // maybe another time but who knows - nero
+        }break;
+        case "webhook":{
             if(!args[0])return;
-            let maxTime = parseInt(args[0], 10);
-            console.log(maxTime);
-            let maxTimeType = args[0].split('');
-            console.log(maxTimeType);
+            let argsLower = args[0].toLowerCase();
+            if(!argsLower)return;
 
-            for(let i = 0; i < maxTimeType.length; i++){
-                console.log(maxTimeType[i]);
-                if(maxTimeType[i].includes('s'))maxTime *= 1000;
-                else if(maxTimeType[i].includes('m'))maxTime *= 60000;
-                else if(maxTimeType[i].includes('hr'))maxTime *= 3600000;
-                else if(maxTimeType[i].includes('d'))maxTime *= 86400000;
-            }
-            console.log(maxTime);
-    
-            var rgb_poll = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
-            const pollEmbed = new discord.MessageEmbed()
-            .setTitle('`POLL`')
-            .setDescription('`THIS IS A POLL FOR ' + title.toUpperCase() + '`')
-            .setColor(rgb_poll)
-            .setTimestamp(moment().format());
-    
-            let poll = await message.channel.send(pollEmbed);
-            poll.react('✅');
-            poll.react('❎');
-    
-            let checks = 0, crosses = 0;
-            const filter = (reaction, user) => {
-                return ['✅', '❎'].includes(reaction.emoji.name);
-            };
-            const collector = poll.createReactionCollector(filter, {time: maxTime});
-            collector.on('collect', (reaction, reactionCollector) => {
-                switch(reaction.emoji.name){
-                case '✅':{
-                    checks += 1;
+            let avatarurl = '';
+            let correctString = '';
+
+            switch(argsLower) {
+            case "edit":{
+                let editLower = args[1].toLowerCase();
+                switch (editLower){
+                case "channel":{
+                    let channelid = parseInt(args[2].toLowerCase(), 10);
+                    if(!channelid)return;
+                    webhookClient.edit({
+                        channel: channelid
+                    }).then(webhook => console.log('edited channel in webhook ' + webhook.channelID)).catch(console.error);
                 }break;
-                case '❎':{
-                    crosses += 1;
+                case "avatar":{
+                    if(args[2])avatarurl = args[2];
+                    else avatarurl = client.user.displayAvatarURL();
+                    webhookClient.edit({
+                        avatar: avatarurl
+                    }).then(webhook => console.log('edited avatar in webhook ' + webhook.avatar)).catch(console.error);
+                }break;
+                case "username":{
+                    if(!args[2])return;
+                    correctString = args[2].toString();
+                    webhookClient.edit({
+                        name: correctString
+                    }).then(webhook => console.log('edited name in webhook ' + webhook.name)).catch(console.error);
                 }break;
                 }
-            });
-            collector.on('end', (reaction, reactionCollector) => {
-                //if(checks > crosses)message.channel.send('checkmarks win');
-                //else if(crosses > checks)message.channel.send('crosses win');
-                //else message.channel.send('draw');
+            }break;
+            case "send":{
+                var rgb_webhook = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
 
-                message.channel.send('`POLL FINISHED`');
-            });
+                const webhookEmbed = new discord.MessageEmbed()
+                .setTitle('`WEBHOOK TESTING`')
+                .setDescription('`UHH OK`')
+                .setColor(rgb_webhook)
+                .setImage(message.author.displayAvatarURL())
+                .setTimestamp(moment().format());
+
+                webhookClient.send('', {
+                    username: correctString,
+                    avatarURL: avatarurl,
+                    embeds: [webhookEmbed]
+                });
+            }break;
+            }
         }break;
         case "howgay":{
             client.cmds.get('howgay').execute(message);
