@@ -5,6 +5,12 @@ const discord = require('discord.js'),
 var {prefix} = require('./config.json');
 const client = new discord.Client();
 
+const cooldown = new Map();
+let cdSeconds = 3;
+
+client.db = require('quick.db');
+client.request = new (require('rss-parser'));
+
 client.cmds = new discord.Collection();
 const commandFiles = fs.readdirSync('./cmds').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
@@ -18,6 +24,7 @@ client.on('ready', () => {
     client.fetchWebhook(process.env.WEBID, process.env.WEBTOKEN)
     .then(webhook => console.log('collected webhook with name:' + webhook.name))
     .catch(console.error);
+    // uploads(); // only uncomment if you have videos on your channel or i am just stupid, but who knows
     console.log('ready');
 });
 client.on('messageReactionAdd', (reaction, user) => {
@@ -25,7 +32,7 @@ client.on('messageReactionAdd', (reaction, user) => {
     if(emoji.name == '👍'){
         let member = message.guild.members.cache.find(member => member.id === user.id);
         if(member){
-            member.roles.add('733838178162704405');
+            member.roles.add(process.env.ROLEID);
         }
     }
 });
@@ -35,78 +42,99 @@ client.on('message', async (message) => {
 
         const args = message.content.slice(prefix.length).split(/ +/);
         const command = args.shift().toLowerCase();
+
+        if(cooldown.has(message.author.id)){
+            message.delete();
+            message.reply('You have to wait 3 seconds between commands.');
+            return;
+        }
+
+        if(!message.member.hasPermission('ADMINISTRATOR'))
+            cooldown.set(message.author.id);
+
+        if(client.cmds.has(command)){
+            let permNeeded = '';
+            let typeOfCommand = client.cmds.get(command).type.toLowerCase();
+            switch(typeOfCommand){
+            case "user":{
+                permNeeded = 'SEND_MESSAGES';
+            }break;
+            case "admin":{
+                permNeeded = 'ADMINISTRATOR';
+            }break;
+            default:
+                break;
+            }
+            let correctMember = message.member.fetch(message.author.id);
+            let hasPerm = (await correctMember).hasPermission(permNeeded);
+            console.log(hasPerm);
+            if(!hasPerm){message.delete()
+                return;}
+        }
+
         switch(command){
         case "avatar":{
             client.cmds.get('avatar').execute(message);
         }break;
         case "verify":{
-            var rgb_verify = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
-            message.delete();
-            const verifyEmbed = new discord.MessageEmbed()
-            .setTitle('REACT TO VERIFY')
-            .setDescription('CLICK THE REACTION DOWN BELOW TO VERIFY')
-            .setColor(rgb_verify);
-            let verify = await message.channel.send(verifyEmbed);
-            await verify.react('👍');
+            client.cmds.get('verify').execute(message);
 
             // 👍 👎
         }break;
         case "poll":{
             client.cmds.get('poll').execute(message, args); // maybe another time but who knows - nero
         }break;
-        case "webhook":{
-            if(!args[0])return;
-            let argsLower = args[0].toLowerCase();
-            if(!argsLower)return;
+        case "countdown":{
+            let count = 5;
+            let countMill = count * 1000;
+            var curTime = new Date().getTime();
+            var endTime = curTime + countMill;
+            const countEmbed = new discord.MessageEmbed()
+            .setTitle('`COUNTDOWN`')
+            .setFooter('TIMER: ' + count);
+            message.channel.send(countEmbed).then(sentMessage => {
+                var timer = setInterval(function () {
+                    var currTime = new Date().getTime();
+                    var remainingTime = endTime - currTime;
+                    if(remainingTime >= 0){
+                        let seconds = Math.floor((remainingTime % (1000 * 60)) / 1000);
+                        //if(seconds < 10)seconds = "0" + seconds;
+                        //var remainingTimeToText = seconds;
+                        console.log(seconds);
+                        var countdownEdit = new discord.MessageEmbed()
+                        .setTitle('`COUNTDOWN`')
+                        .setFooter('TIMER: ' + seconds);
+                        sentMessage.edit(countdownEdit).catch((err) => {
+                            console.error(err);
+                        });
+                    }else {
+                        clearInterval(timer);
+                    }
+                }, 1000);
 
-            let avatarurl = '';
-            let correctString = '';
-
-            switch(argsLower) {
-            case "edit":{
-                let editLower = args[1].toLowerCase();
-                switch (editLower){
-                case "channel":{
-                    let channelid = parseInt(args[2].toLowerCase(), 10);
-                    if(!channelid)return;
-                    webhookClient.edit({
-                        channel: channelid
-                    }).then(webhook => console.log('edited channel in webhook ' + webhook.channelID)).catch(console.error);
-                }break;
-                case "avatar":{
-                    if(args[2])avatarurl = args[2];
-                    else avatarurl = client.user.displayAvatarURL();
-                    webhookClient.edit({
-                        avatar: avatarurl
-                    }).then(webhook => console.log('edited avatar in webhook ' + webhook.avatar)).catch(console.error);
-                }break;
-                case "username":{
-                    if(!args[2])return;
-                    correctString = args[2].toString();
-                    webhookClient.edit({
-                        name: correctString
-                    }).then(webhook => console.log('edited name in webhook ' + webhook.name)).catch(console.error);
-                }break;
-                }
-            }break;
-            case "send":{
-                var rgb_webhook = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
-
-                const webhookEmbed = new discord.MessageEmbed()
-                .setTitle('`WEBHOOK TESTING`')
-                .setDescription('`UHH OK`')
-                .setColor(rgb_webhook)
-                .setImage(message.author.displayAvatarURL())
-                .setTimestamp(moment().format());
-
-                webhookClient.send('', {
-                    username: correctString,
-                    avatarURL: avatarurl,
-                    embeds: [webhookEmbed]
+                sentMessage.delete({timeout: countMill}).then(() => {
+                    console.log('message deleted');
                 });
-            }break;
-            }
+            });
         }break;
+        case "requests":{
+            client.cmds.get('requests').execute(message, args);
+        }break;
+        case "webhook":{
+            client.cmds.get('webhook').execute(message, args, webhookClient);
+        }break;
+        // case "messagecollecter":{
+        //     let filter = msg => {
+        //         if(msg.author.id === message.author.id){
+        //             if(msg.content.toLowerCase() === 'done')collector.stop();
+        //             else return true;
+        //         }
+        //         else return false;
+        //     };
+        //     let collector = message.channel.createMessageCollector(filter, {max: 4});
+        //     let messages = await getMessages(collector);
+        //     message.channel.send(messages.join('\n'));
+        // }break;
         case "howgay":{
             client.cmds.get('howgay').execute(message);
         }break;
@@ -158,7 +186,44 @@ client.on('message', async (message) => {
             }
         }break;
         }
+
+        setTimeout(() => {
+            cooldown.delete(message.author.id);
+        }, cdSeconds * 1000);
     }
 });
+
+function getMessages(collector){
+    return new Promise((resolve, reject) => {
+        collector.on('end', collected => resolve(collected.map(m => m.content)));
+    });
+}
+
+// credits go to ansonfoong on github, you need to have a least one youtube video on your channel or it will continue to throw you errors/warning
+let messageTemplate = "Hello @everyone, **{author}** just now uploaded a video **{title}**!\n{url}"; // you can change where this goes or what it says
+let channelid = client.channels.cache.find(ch => ch.id === process.env.ANNOUNCEMENTSCHANNELID);
+function uploads(){
+    if(client.db.fetch(`postedVideos`) === null)client.db.set(`postedVideos`, []);
+    setInterval(() => {
+        client.request.parseURL(`https://www.youtube.com/feeds/videos.xml?channel_id=${process.env.YOUTUBECHANNELID}`)
+        .then(data => {
+            if (client.db.fetch(`postedVideos`).includes(data.items[0].link)) return;
+            else {
+                client.db.set(`videoData`, data.items[0]);
+                client.db.push("postedVideos", data.items[0].link);
+                let parsed = client.db.fetch(`videoData`);
+                let channel = client.channels.cache.get(channelid);
+                if (!channel) return;
+                let message = messageTemplate
+                    .replace(/{author}/g, parsed.author)
+                    .replace(/{title}/g, discord.Util.escapeMarkdown(parsed.title))
+                    .replace(/{url}/g, parsed.link);
+                channel.send(message);
+            }
+        }).catch(console.error); // it was giving me a warning about it but oh well
+    }), 30000; // every 30 seconds
+}
+
+
 
 client.login(process.env.BOTKEY);
