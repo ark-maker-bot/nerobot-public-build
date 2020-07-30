@@ -1,11 +1,12 @@
 const discord = require('discord.js');
 const moment = require('moment');
+
 module.exports = {
-	name: 'purge',
+    name: "purge",
     description: `deletes the amount of messages`,
     params: '<integer> ',
     type: 'admin',
-	execute(message, args) {
+    execute(message, args) {
         console.log('purge command has started');
         if(args[0]){
             var rgb = [Math.random() * 256, Math.random() * 256, Math.random() * 256];
@@ -28,7 +29,7 @@ module.exports = {
                     let countMill = count * 1000;
                     var curTime = new Date().getTime();
                     var endTime = curTime + countMill;
-
+    
                     var timer = setInterval(function () {
                         var currTime = new Date().getTime();
                         var remainingTime = endTime - currTime;
@@ -51,7 +52,7 @@ module.exports = {
                             clearInterval(timer);
                         }
                     }, 1000);
-
+    
                     sentMessage.delete({timeout: 5000}).then(() => {
                         console.log('purge complete');
                     });
@@ -61,5 +62,5 @@ module.exports = {
                 message.channel.send("`ERROR: ERROR CLEARING CHANNEL.`");
             });
         }
-	},
+    }
 };
